@@ -21,22 +21,16 @@ buildscript {
 
 
 allprojects {
-//    repositories {
-//        flatDir {
-//            dirs 'libs'
-//        }
-//    }
+    repositories {
+        flatDir {
+            dirs 'libs'
+        }
+    }
 
 
     repositories {
         //maven { url 'http://raw.github.com/saki4510t/libcommon/master/repository/' }
 
-        maven { url 'https://jitpack.io' }
-        maven { url 'http://maven.aliyun.com/nexus/content/groups/public/' }// 阿里云maven镜像
-        maven { url 'https://maven.aliyun.com/repository/public' }
-        maven { url 'https://maven.aliyun.com/repository/central' }
-        maven { url 'https://maven.aliyun.com/repository/google' }
-        maven { url 'https://maven.google.com' }
         mavenLocal()
         mavenCentral()
         google()
