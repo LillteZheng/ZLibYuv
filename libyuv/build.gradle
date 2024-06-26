@@ -14,6 +14,9 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
         externalNativeBuild {
+            ndk {
+                abiFilters "armeabi-v7a" ,"arm64-v8a"//, "x86", "armeabi"  按需设置
+            }
             cmake {
                 cppFlags ""
             }
