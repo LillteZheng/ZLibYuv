@@ -1,4 +1,3 @@
-include(":libyuv")
-rootProject.name = "CmakeDemo"
+rootProject.name = "LibYuvDemo"
 include ':app'
 include ':libyuv'
