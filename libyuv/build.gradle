@@ -1,4 +1,5 @@
 apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
 apply plugin: 'com.github.dcendents.android-maven'
 group='com.github.LillteZheng'
 android {
@@ -41,6 +42,7 @@ android {
             version '3.18.1'
         }
     }
+    ndkVersion '23.0.7599858'
 
 }
 
