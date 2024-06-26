@@ -46,7 +46,7 @@ afterEvaluate {
                 // You can then customize attributes of the publication as shown below.
                 groupId = 'com.zhengsr.libyuv'
                 artifactId = 'yuvtools'
-                version = '1.0'
+                version = '1.5'
             }
             // Creates a Maven publication called “debug”.
         }
