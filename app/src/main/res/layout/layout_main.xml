@@ -6,6 +6,7 @@
     android:layout_height="match_parent">
 
    <LinearLayout
+       android:id="@+id/srcly"
        android:layout_width="200dp"
        android:gravity="center_horizontal"
        android:orientation="vertical"
@@ -21,12 +22,52 @@
            android:text="原图片"/>
 
        <ImageView
-           android:id="@+id/srcImg"
            android:layout_width="match_parent"
            android:layout_height="match_parent"
            android:src="@mipmap/meinv"
            />
    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="200dp"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        app:layout_constraintStart_toEndOf="@id/srcly"
+        app:layout_constraintTop_toTopOf="parent"
+        android:layout_marginStart="20dp"
+        android:layout_height="300dp">
+
+        <TextView
+            android:id="@+id/destTxt"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/black"
+            android:textSize="16sp"
+            />
+
+        <ImageView
+            android:id="@+id/destImg"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            />
+    </LinearLayout>
+
+
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:layout_width="match_parent"
+        app:layout_constraintTop_toBottomOf="@id/srcly"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        android:orientation="horizontal"
+        >
+        <Button
+            android:id="@+id/scale"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="缩放"
+            />
+
+    </androidx.appcompat.widget.LinearLayoutCompat>
 
 
 </androidx.constraintlayout.widget.ConstraintLayout>
