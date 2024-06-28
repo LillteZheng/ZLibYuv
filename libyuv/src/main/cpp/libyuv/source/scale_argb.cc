@@ -16,7 +16,6 @@
 #include "libyuv/cpu_id.h"
 #include "libyuv/planar_functions.h"  // For CopyARGB
 #include "libyuv/row.h"
-#include "libyuv/scale_argb.h"
 #include "libyuv/scale_row.h"
 
 #ifdef __cplusplus
@@ -59,9 +58,9 @@ static void ScaleARGBDown2(int src_width,
   assert((dy & 0x1ffff) == 0);  // Test vertical scale is multiple of 2.
   // Advance to odd row, even column.
   if (filtering == kFilterBilinear) {
-    src_argb += (y >> 16) * (intptr_t)src_stride + (x >> 16) * 4;
+    src_argb += (y >> 16) * (int64_t)src_stride + (x >> 16) * 4;
   } else {
-    src_argb += (y >> 16) * (intptr_t)src_stride + ((x >> 16) - 1) * 4;
+    src_argb += (y >> 16) * (int64_t)src_stride + ((x >> 16) - 1) * 4;
   }
 
 #if defined(HAS_SCALEARGBROWDOWN2_SSE2)
@@ -128,15 +127,6 @@ static void ScaleARGBDown2(int src_width,
     }
   }
 #endif
-#if defined(HAS_SCALEARGBROWDOWN2_RVV)
-  if (TestCpuFlag(kCpuHasRVV)) {
-    ScaleARGBRowDown2 =
-        filtering == kFilterNone
-            ? ScaleARGBRowDown2_RVV
-            : (filtering == kFilterLinear ? ScaleARGBRowDown2Linear_RVV
-                                          : ScaleARGBRowDown2Box_RVV);
-  }
-#endif
 
   if (filtering == kFilterLinear) {
     src_stride = 0;
@@ -151,33 +141,28 @@ static void ScaleARGBDown2(int src_width,
 // ScaleARGB ARGB, 1/4
 // This is an optimized version for scaling down a ARGB to 1/4 of
 // its original size.
-static int ScaleARGBDown4Box(int src_width,
-                             int src_height,
-                             int dst_width,
-                             int dst_height,
-                             int src_stride,
-                             int dst_stride,
-                             const uint8_t* src_argb,
-                             uint8_t* dst_argb,
-                             int x,
-                             int dx,
-                             int y,
-                             int dy) {
+static void ScaleARGBDown4Box(int src_width,
+                              int src_height,
+                              int dst_width,
+                              int dst_height,
+                              int src_stride,
+                              int dst_stride,
+                              const uint8_t* src_argb,
+                              uint8_t* dst_argb,
+                              int x,
+                              int dx,
+                              int y,
+                              int dy) {
   int j;
   // Allocate 2 rows of ARGB.
-  const int row_size = (dst_width * 2 * 4 + 31) & ~31;
-  // TODO(fbarchard): Remove this row buffer and implement a ScaleARGBRowDown4
-  // but implemented via a 2 pass wrapper that uses a very small array on the
-  // stack with a horizontal loop.
-  align_buffer_64(row, row_size * 2);
-  if (!row)
-    return 1;
+  const int kRowSize = (dst_width * 2 * 4 + 31) & ~31;
+  align_buffer_64(row, kRowSize * 2);
   int row_stride = src_stride * (dy >> 16);
   void (*ScaleARGBRowDown2)(const uint8_t* src_argb, ptrdiff_t src_stride,
                             uint8_t* dst_argb, int dst_width) =
       ScaleARGBRowDown2Box_C;
   // Advance to odd row, even column.
-  src_argb += (y >> 16) * (intptr_t)src_stride + (x >> 16) * 4;
+  src_argb += (y >> 16) * (int64_t)src_stride + (x >> 16) * 4;
   (void)src_width;
   (void)src_height;
   (void)dx;
@@ -199,22 +184,16 @@ static int ScaleARGBDown4Box(int src_width,
     }
   }
 #endif
-#if defined(HAS_SCALEARGBROWDOWN2_RVV)
-  if (TestCpuFlag(kCpuHasRVV)) {
-    ScaleARGBRowDown2 = ScaleARGBRowDown2Box_RVV;
-  }
-#endif
 
   for (j = 0; j < dst_height; ++j) {
     ScaleARGBRowDown2(src_argb, src_stride, row, dst_width * 2);
-    ScaleARGBRowDown2(src_argb + src_stride * 2, src_stride, row + row_size,
+    ScaleARGBRowDown2(src_argb + src_stride * 2, src_stride, row + kRowSize,
                       dst_width * 2);
-    ScaleARGBRowDown2(row, row_size, dst_argb, dst_width);
+    ScaleARGBRowDown2(row, kRowSize, dst_argb, dst_width);
     src_argb += row_stride;
     dst_argb += dst_stride;
   }
   free_aligned_buffer_64(row);
-  return 0;
 }
 
 // ScaleARGB ARGB Even
@@ -235,7 +214,7 @@ static void ScaleARGBDownEven(int src_width,
                               enum FilterMode filtering) {
   int j;
   int col_step = dx >> 16;
-  ptrdiff_t row_stride = (ptrdiff_t)((dy >> 16) * (intptr_t)src_stride);
+  int row_stride = (dy >> 16) * (int64_t)src_stride;
   void (*ScaleARGBRowDownEven)(const uint8_t* src_argb, ptrdiff_t src_stride,
                                int src_step, uint8_t* dst_argb, int dst_width) =
       filtering ? ScaleARGBRowDownEvenBox_C : ScaleARGBRowDownEven_C;
@@ -243,7 +222,7 @@ static void ScaleARGBDownEven(int src_width,
   (void)src_height;
   assert(IS_ALIGNED(src_width, 2));
   assert(IS_ALIGNED(src_height, 2));
-  src_argb += (y >> 16) * (intptr_t)src_stride + (x >> 16) * 4;
+  src_argb += (y >> 16) * (int64_t)src_stride + (x >> 16) * 4;
 #if defined(HAS_SCALEARGBROWDOWNEVEN_SSE2)
   if (TestCpuFlag(kCpuHasSSE2)) {
     ScaleARGBRowDownEven = filtering ? ScaleARGBRowDownEvenBox_Any_SSE2
@@ -284,16 +263,6 @@ static void ScaleARGBDownEven(int src_width,
     }
   }
 #endif
-#if defined(HAS_SCALEARGBROWDOWNEVENBOX_RVV)
-  if (filtering && TestCpuFlag(kCpuHasRVV)) {
-    ScaleARGBRowDownEven = ScaleARGBRowDownEvenBox_RVV;
-  }
-#endif
-#if defined(HAS_SCALEARGBROWDOWNEVEN_RVV)
-  if (!filtering && TestCpuFlag(kCpuHasRVV)) {
-    ScaleARGBRowDownEven = ScaleARGBRowDownEven_RVV;
-  }
-#endif
 
   if (filtering == kFilterLinear) {
     src_stride = 0;
@@ -306,24 +275,24 @@ static void ScaleARGBDownEven(int src_width,
 }
 
 // Scale ARGB down with bilinear interpolation.
-static int ScaleARGBBilinearDown(int src_width,
-                                 int src_height,
-                                 int dst_width,
-                                 int dst_height,
-                                 int src_stride,
-                                 int dst_stride,
-                                 const uint8_t* src_argb,
-                                 uint8_t* dst_argb,
-                                 int x,
-                                 int dx,
-                                 int y,
-                                 int dy,
-                                 enum FilterMode filtering) {
+static void ScaleARGBBilinearDown(int src_width,
+                                  int src_height,
+                                  int dst_width,
+                                  int dst_height,
+                                  int src_stride,
+                                  int dst_stride,
+                                  const uint8_t* src_argb,
+                                  uint8_t* dst_argb,
+                                  int x,
+                                  int dx,
+                                  int y,
+                                  int dy,
+                                  enum FilterMode filtering) {
   int j;
-  void (*InterpolateRow)(uint8_t* dst_argb, const uint8_t* src_argb,
+  void (*InterpolateRow)(uint8_t * dst_argb, const uint8_t* src_argb,
                          ptrdiff_t src_stride, int dst_width,
                          int source_y_fraction) = InterpolateRow_C;
-  void (*ScaleARGBFilterCols)(uint8_t* dst_argb, const uint8_t* src_argb,
+  void (*ScaleARGBFilterCols)(uint8_t * dst_argb, const uint8_t* src_argb,
                               int dst_width, int x, int dx) =
       (src_width >= 32768) ? ScaleARGBFilterCols64_C : ScaleARGBFilterCols_C;
   int64_t xlast = x + (int64_t)(dst_width - 1) * dx;
@@ -379,11 +348,6 @@ static int ScaleARGBBilinearDown(int src_width,
     }
   }
 #endif
-#if defined(HAS_INTERPOLATEROW_RVV)
-  if (TestCpuFlag(kCpuHasRVV)) {
-    InterpolateRow = InterpolateRow_RVV;
-  }
-#endif
 #if defined(HAS_SCALEARGBFILTERCOLS_SSSE3)
   if (TestCpuFlag(kCpuHasSSSE3) && src_width < 32768) {
     ScaleARGBFilterCols = ScaleARGBFilterCols_SSSE3;
@@ -417,8 +381,6 @@ static int ScaleARGBBilinearDown(int src_width,
   // Allocate a row of ARGB.
   {
     align_buffer_64(row, clip_src_width * 4);
-    if (!row)
-      return 1;
 
     const int max_y = (src_height - 1) << 16;
     if (y > max_y) {
@@ -426,7 +388,7 @@ static int ScaleARGBBilinearDown(int src_width,
     }
     for (j = 0; j < dst_height; ++j) {
       int yi = y >> 16;
-      const uint8_t* src = src_argb + yi * (intptr_t)src_stride;
+      const uint8_t* src = src_argb + yi * (int64_t)src_stride;
       if (filtering == kFilterLinear) {
         ScaleARGBFilterCols(dst_argb, src, dst_width, x, dx);
       } else {
@@ -442,28 +404,27 @@ static int ScaleARGBBilinearDown(int src_width,
     }
     free_aligned_buffer_64(row);
   }
-  return 0;
 }
 
 // Scale ARGB up with bilinear interpolation.
-static int ScaleARGBBilinearUp(int src_width,
-                               int src_height,
-                               int dst_width,
-                               int dst_height,
-                               int src_stride,
-                               int dst_stride,
-                               const uint8_t* src_argb,
-                               uint8_t* dst_argb,
-                               int x,
-                               int dx,
-                               int y,
-                               int dy,
-                               enum FilterMode filtering) {
+static void ScaleARGBBilinearUp(int src_width,
+                                int src_height,
+                                int dst_width,
+                                int dst_height,
+                                int src_stride,
+                                int dst_stride,
+                                const uint8_t* src_argb,
+                                uint8_t* dst_argb,
+                                int x,
+                                int dx,
+                                int y,
+                                int dy,
+                                enum FilterMode filtering) {
   int j;
-  void (*InterpolateRow)(uint8_t* dst_argb, const uint8_t* src_argb,
+  void (*InterpolateRow)(uint8_t * dst_argb, const uint8_t* src_argb,
                          ptrdiff_t src_stride, int dst_width,
                          int source_y_fraction) = InterpolateRow_C;
-  void (*ScaleARGBFilterCols)(uint8_t* dst_argb, const uint8_t* src_argb,
+  void (*ScaleARGBFilterCols)(uint8_t * dst_argb, const uint8_t* src_argb,
                               int dst_width, int x, int dx) =
       filtering ? ScaleARGBFilterCols_C : ScaleARGBCols_C;
   const int max_y = (src_height - 1) << 16;
@@ -505,11 +466,6 @@ static int ScaleARGBBilinearUp(int src_width,
     if (IS_ALIGNED(dst_width, 8)) {
       InterpolateRow = InterpolateRow_LSX;
     }
-  }
-#endif
-#if defined(HAS_INTERPOLATEROW_RVV)
-  if (TestCpuFlag(kCpuHasRVV)) {
-    InterpolateRow = InterpolateRow_RVV;
   }
 #endif
   if (src_width >= 32768) {
@@ -589,16 +545,14 @@ static int ScaleARGBBilinearUp(int src_width,
 
   {
     int yi = y >> 16;
-    const uint8_t* src = src_argb + yi * (intptr_t)src_stride;
+    const uint8_t* src = src_argb + yi * (int64_t)src_stride;
 
     // Allocate 2 rows of ARGB.
-    const int row_size = (dst_width * 4 + 31) & ~31;
-    align_buffer_64(row, row_size * 2);
-    if (!row)
-      return 1;
+    const int kRowSize = (dst_width * 4 + 31) & ~31;
+    align_buffer_64(row, kRowSize * 2);
 
     uint8_t* rowptr = row;
-    int rowstride = row_size;
+    int rowstride = kRowSize;
     int lasty = yi;
 
     ScaleARGBFilterCols(rowptr, src, dst_width, x, dx);
@@ -606,9 +560,7 @@ static int ScaleARGBBilinearUp(int src_width,
       src += src_stride;
     }
     ScaleARGBFilterCols(rowptr + rowstride, src, dst_width, x, dx);
-    if (src_height > 2) {
-      src += src_stride;
-    }
+    src += src_stride;
 
     for (j = 0; j < dst_height; ++j) {
       yi = y >> 16;
@@ -616,16 +568,14 @@ static int ScaleARGBBilinearUp(int src_width,
         if (y > max_y) {
           y = max_y;
           yi = y >> 16;
-          src = src_argb + yi * (intptr_t)src_stride;
+          src = src_argb + yi * (int64_t)src_stride;
         }
         if (yi != lasty) {
           ScaleARGBFilterCols(rowptr, src, dst_width, x, dx);
           rowptr += rowstride;
           rowstride = -rowstride;
           lasty = yi;
-          if ((y + 65536) < max_y) {
-            src += src_stride;
-          }
+          src += src_stride;
         }
       }
       if (filtering == kFilterLinear) {
@@ -639,28 +589,27 @@ static int ScaleARGBBilinearUp(int src_width,
     }
     free_aligned_buffer_64(row);
   }
-  return 0;
 }
 
 #ifdef YUVSCALEUP
 // Scale YUV to ARGB up with bilinear interpolation.
-static int ScaleYUVToARGBBilinearUp(int src_width,
-                                    int src_height,
-                                    int dst_width,
-                                    int dst_height,
-                                    int src_stride_y,
-                                    int src_stride_u,
-                                    int src_stride_v,
-                                    int dst_stride_argb,
-                                    const uint8_t* src_y,
-                                    const uint8_t* src_u,
-                                    const uint8_t* src_v,
-                                    uint8_t* dst_argb,
-                                    int x,
-                                    int dx,
-                                    int y,
-                                    int dy,
-                                    enum FilterMode filtering) {
+static void ScaleYUVToARGBBilinearUp(int src_width,
+                                     int src_height,
+                                     int dst_width,
+                                     int dst_height,
+                                     int src_stride_y,
+                                     int src_stride_u,
+                                     int src_stride_v,
+                                     int dst_stride_argb,
+                                     const uint8_t* src_y,
+                                     const uint8_t* src_u,
+                                     const uint8_t* src_v,
+                                     uint8_t* dst_argb,
+                                     int x,
+                                     int dx,
+                                     int y,
+                                     int dy,
+                                     enum FilterMode filtering) {
   int j;
   void (*I422ToARGBRow)(const uint8_t* y_buf, const uint8_t* u_buf,
                         const uint8_t* v_buf, uint8_t* rgb_buf, int width) =
@@ -682,8 +631,7 @@ static int ScaleYUVToARGBBilinearUp(int src_width,
   }
 #endif
 #if defined(HAS_I422TOARGBROW_AVX512BW)
-  if (TestCpuFlag(kCpuHasAVX512BW | kCpuHasAVX512VL) ==
-      (kCpuHasAVX512BW | kCpuHasAVX512VL)) {
+  if (TestCpuFlag(kCpuHasAVX512BW | kCpuHasAVX512VL) == (kCpuHasAVX512BW | kCpuHasAVX512VL)) {
     I422ToARGBRow = I422ToARGBRow_Any_AVX512BW;
     if (IS_ALIGNED(src_width, 32)) {
       I422ToARGBRow = I422ToARGBRow_AVX512BW;
@@ -698,24 +646,11 @@ static int ScaleYUVToARGBBilinearUp(int src_width,
     }
   }
 #endif
-#if defined(HAS_I422TOARGBROW_SVE2)
-  if (TestCpuFlag(kCpuHasSVE2)) {
-    I422ToARGBRow = I422ToARGBRow_SVE2;
-  }
-#endif
 #if defined(HAS_I422TOARGBROW_MSA)
   if (TestCpuFlag(kCpuHasMSA)) {
     I422ToARGBRow = I422ToARGBRow_Any_MSA;
     if (IS_ALIGNED(src_width, 8)) {
       I422ToARGBRow = I422ToARGBRow_MSA;
-    }
-  }
-#endif
-#if defined(HAS_I422TOARGBROW_LSX)
-  if (TestCpuFlag(kCpuHasLSX)) {
-    I422ToARGBRow = I422ToARGBRow_Any_LSX;
-    if (IS_ALIGNED(src_width, 16)) {
-      I422ToARGBRow = I422ToARGBRow_LSX;
     }
   }
 #endif
@@ -727,13 +662,8 @@ static int ScaleYUVToARGBBilinearUp(int src_width,
     }
   }
 #endif
-#if defined(HAS_I422TOARGBROW_RVV)
-  if (TestCpuFlag(kCpuHasRVV)) {
-    I422ToARGBRow = I422ToARGBRow_RVV;
-  }
-#endif
 
-  void (*InterpolateRow)(uint8_t* dst_argb, const uint8_t* src_argb,
+  void (*InterpolateRow)(uint8_t * dst_argb, const uint8_t* src_argb,
                          ptrdiff_t src_stride, int dst_width,
                          int source_y_fraction) = InterpolateRow_C;
 #if defined(HAS_INTERPOLATEROW_SSSE3)
@@ -776,13 +706,8 @@ static int ScaleYUVToARGBBilinearUp(int src_width,
     }
   }
 #endif
-#if defined(HAS_INTERPOLATEROW_RVV)
-  if (TestCpuFlag(kCpuHasRVV)) {
-    InterpolateRow = InterpolateRow_RVV;
-  }
-#endif
 
-  void (*ScaleARGBFilterCols)(uint8_t* dst_argb, const uint8_t* src_argb,
+  void (*ScaleARGBFilterCols)(uint8_t * dst_argb, const uint8_t* src_argb,
                               int dst_width, int x, int dx) =
       filtering ? ScaleARGBFilterCols_C : ScaleARGBCols_C;
   if (src_width >= 32768) {
@@ -863,21 +788,20 @@ static int ScaleYUVToARGBBilinearUp(int src_width,
   const int kYShift = 1;  // Shift Y by 1 to convert Y plane to UV coordinate.
   int yi = y >> 16;
   int uv_yi = yi >> kYShift;
-  const uint8_t* src_row_y = src_y + yi * (intptr_t)src_stride_y;
-  const uint8_t* src_row_u = src_u + uv_yi * (intptr_t)src_stride_u;
-  const uint8_t* src_row_v = src_v + uv_yi * (intptr_t)src_stride_v;
+  const uint8_t* src_row_y = src_y + yi * (int64_t)src_stride_y;
+  const uint8_t* src_row_u = src_u + uv_yi * (int64_t)src_stride_u;
+  const uint8_t* src_row_v = src_v + uv_yi * (int64_t)src_stride_v;
 
-  // Allocate 1 row of ARGB for source conversion and 2 rows of ARGB
-  // scaled horizontally to the destination width.
-  const int row_size = (dst_width * 4 + 31) & ~31;
-  align_buffer_64(row, row_size * 2 + src_width * 4);
+  // Allocate 2 rows of ARGB.
+  const int kRowSize = (dst_width * 4 + 31) & ~31;
+  align_buffer_64(row, kRowSize * 2);
 
-  uint8_t* argb_row = row + row_size * 2;
+  // Allocate 1 row of ARGB for source conversion.
+  align_buffer_64(argb_row, src_width * 4);
+
   uint8_t* rowptr = row;
-  int rowstride = row_size;
+  int rowstride = kRowSize;
   int lasty = yi;
-  if (!row)
-    return 1;
 
   // TODO(fbarchard): Convert first 2 rows of YUV to ARGB.
   ScaleARGBFilterCols(rowptr, src_row_y, dst_width, x, dx);
@@ -904,9 +828,9 @@ static int ScaleYUVToARGBBilinearUp(int src_width,
         y = max_y;
         yi = y >> 16;
         uv_yi = yi >> kYShift;
-        src_row_y = src_y + yi * (intptr_t)src_stride_y;
-        src_row_u = src_u + uv_yi * (intptr_t)src_stride_u;
-        src_row_v = src_v + uv_yi * (intptr_t)src_stride_v;
+        src_row_y = src_y + yi * (int64_t)src_stride_y;
+        src_row_u = src_u + uv_yi * (int64_t)src_stride_u;
+        src_row_v = src_v + uv_yi * (int64_t)src_stride_v;
       }
       if (yi != lasty) {
         // TODO(fbarchard): Convert the clipped region of row.
@@ -932,7 +856,7 @@ static int ScaleYUVToARGBBilinearUp(int src_width,
     y += dy;
   }
   free_aligned_buffer_64(row);
-  return 0;
+  free_aligned_buffer_64(row_argb);
 }
 #endif
 
@@ -954,7 +878,7 @@ static void ScaleARGBSimple(int src_width,
                             int y,
                             int dy) {
   int j;
-  void (*ScaleARGBCols)(uint8_t* dst_argb, const uint8_t* src_argb,
+  void (*ScaleARGBCols)(uint8_t * dst_argb, const uint8_t* src_argb,
                         int dst_width, int x, int dx) =
       (src_width >= 32768) ? ScaleARGBCols64_C : ScaleARGBCols_C;
   (void)src_height;
@@ -997,7 +921,7 @@ static void ScaleARGBSimple(int src_width,
   }
 
   for (j = 0; j < dst_height; ++j) {
-    ScaleARGBCols(dst_argb, src_argb + (y >> 16) * (intptr_t)src_stride,
+    ScaleARGBCols(dst_argb, src_argb + (y >> 16) * (int64_t)src_stride,
                   dst_width, x, dx);
     dst_argb += dst_stride;
     y += dy;
@@ -1007,19 +931,19 @@ static void ScaleARGBSimple(int src_width,
 // ScaleARGB a ARGB.
 // This function in turn calls a scaling function
 // suitable for handling the desired resolutions.
-static int ScaleARGB(const uint8_t* src,
-                     int src_stride,
-                     int src_width,
-                     int src_height,
-                     uint8_t* dst,
-                     int dst_stride,
-                     int dst_width,
-                     int dst_height,
-                     int clip_x,
-                     int clip_y,
-                     int clip_width,
-                     int clip_height,
-                     enum FilterMode filtering) {
+static void ScaleARGB(const uint8_t* src,
+                      int src_stride,
+                      int src_width,
+                      int src_height,
+                      uint8_t* dst,
+                      int dst_stride,
+                      int dst_width,
+                      int dst_height,
+                      int clip_x,
+                      int clip_y,
+                      int clip_width,
+                      int clip_height,
+                      enum FilterMode filtering) {
   // Initial source x/y coordinate and step values as 16.16 fixed point.
   int x = 0;
   int y = 0;
@@ -1033,7 +957,7 @@ static int ScaleARGB(const uint8_t* src,
   // Negative src_height means invert the image.
   if (src_height < 0) {
     src_height = -src_height;
-    src = src + (src_height - 1) * (intptr_t)src_stride;
+    src = src + (src_height - 1) * (int64_t)src_stride;
     src_stride = -src_stride;
   }
   ScaleSlope(src_width, src_height, dst_width, dst_height, filtering, &x, &y,
@@ -1048,7 +972,7 @@ static int ScaleARGB(const uint8_t* src,
   if (clip_y) {
     int64_t clipf = (int64_t)(clip_y)*dy;
     y += (clipf & 0xffff);
-    src += (clipf >> 16) * (intptr_t)src_stride;
+    src += (clipf >> 16) * (int64_t)src_stride;
     dst += clip_y * dst_stride;
   }
 
@@ -1064,27 +988,27 @@ static int ScaleARGB(const uint8_t* src,
           ScaleARGBDown2(src_width, src_height, clip_width, clip_height,
                          src_stride, dst_stride, src, dst, x, dx, y, dy,
                          filtering);
-          return 0;
+          return;
         }
         if (dx == 0x40000 && filtering == kFilterBox) {
           // Optimized 1/4 box downsample.
-          return ScaleARGBDown4Box(src_width, src_height, clip_width,
-                                   clip_height, src_stride, dst_stride, src,
-                                   dst, x, dx, y, dy);
+          ScaleARGBDown4Box(src_width, src_height, clip_width, clip_height,
+                            src_stride, dst_stride, src, dst, x, dx, y, dy);
+          return;
         }
         ScaleARGBDownEven(src_width, src_height, clip_width, clip_height,
                           src_stride, dst_stride, src, dst, x, dx, y, dy,
                           filtering);
-        return 0;
+        return;
       }
       // Optimized odd scale down. ie 3, 5, 7, 9x.
       if ((dx & 0x10000) && (dy & 0x10000)) {
         filtering = kFilterNone;
         if (dx == 0x10000 && dy == 0x10000) {
           // Straight copy.
-          ARGBCopy(src + (y >> 16) * (intptr_t)src_stride + (x >> 16) * 4,
+          ARGBCopy(src + (y >> 16) * (int64_t)src_stride + (x >> 16) * 4,
                    src_stride, dst, dst_stride, clip_width, clip_height);
-          return 0;
+          return;
         }
       }
     }
@@ -1092,22 +1016,23 @@ static int ScaleARGB(const uint8_t* src,
   if (dx == 0x10000 && (x & 0xffff) == 0) {
     // Arbitrary scale vertically, but unscaled horizontally.
     ScalePlaneVertical(src_height, clip_width, clip_height, src_stride,
-                       dst_stride, src, dst, x, y, dy, /*bpp=*/4, filtering);
-    return 0;
+                       dst_stride, src, dst, x, y, dy, 4, filtering);
+    return;
   }
   if (filtering && dy < 65536) {
-    return ScaleARGBBilinearUp(src_width, src_height, clip_width, clip_height,
-                               src_stride, dst_stride, src, dst, x, dx, y, dy,
-                               filtering);
+    ScaleARGBBilinearUp(src_width, src_height, clip_width, clip_height,
+                        src_stride, dst_stride, src, dst, x, dx, y, dy,
+                        filtering);
+    return;
   }
   if (filtering) {
-    return ScaleARGBBilinearDown(src_width, src_height, clip_width, clip_height,
-                                 src_stride, dst_stride, src, dst, x, dx, y, dy,
-                                 filtering);
+    ScaleARGBBilinearDown(src_width, src_height, clip_width, clip_height,
+                          src_stride, dst_stride, src, dst, x, dx, y, dy,
+                          filtering);
+    return;
   }
   ScaleARGBSimple(src_width, src_height, clip_width, clip_height, src_stride,
                   dst_stride, src, dst, x, dx, y, dy);
-  return 0;
 }
 
 LIBYUV_API
@@ -1131,9 +1056,10 @@ int ARGBScaleClip(const uint8_t* src_argb,
       (clip_y + clip_height) > dst_height) {
     return -1;
   }
-  return ScaleARGB(src_argb, src_stride_argb, src_width, src_height, dst_argb,
-                   dst_stride_argb, dst_width, dst_height, clip_x, clip_y,
-                   clip_width, clip_height, filtering);
+  ScaleARGB(src_argb, src_stride_argb, src_width, src_height, dst_argb,
+            dst_stride_argb, dst_width, dst_height, clip_x, clip_y, clip_width,
+            clip_height, filtering);
+  return 0;
 }
 
 // Scale an ARGB image.
@@ -1151,9 +1077,10 @@ int ARGBScale(const uint8_t* src_argb,
       src_height > 32768 || !dst_argb || dst_width <= 0 || dst_height <= 0) {
     return -1;
   }
-  return ScaleARGB(src_argb, src_stride_argb, src_width, src_height, dst_argb,
-                   dst_stride_argb, dst_width, dst_height, 0, 0, dst_width,
-                   dst_height, filtering);
+  ScaleARGB(src_argb, src_stride_argb, src_width, src_height, dst_argb,
+            dst_stride_argb, dst_width, dst_height, 0, 0, dst_width, dst_height,
+            filtering);
+  return 0;
 }
 
 // Scale with YUV conversion to ARGB and clipping.
@@ -1177,11 +1104,8 @@ int YUVToARGBScaleClip(const uint8_t* src_y,
                        int clip_width,
                        int clip_height,
                        enum FilterMode filtering) {
-  int r;
   uint8_t* argb_buffer = (uint8_t*)malloc(src_width * src_height * 4);
-  if (!argb_buffer) {
-    return 1;  // Out of memory runtime error.
-  }
+  int r;
   (void)src_fourcc;  // TODO(fbarchard): implement and/or assert.
   (void)dst_fourcc;
   I420ToARGB(src_y, src_stride_y, src_u, src_stride_u, src_v, src_stride_v,

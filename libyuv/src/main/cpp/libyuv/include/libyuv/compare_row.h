@@ -28,10 +28,7 @@ extern "C" {
 #endif
 // MemorySanitizer does not support assembly code yet. http://crbug.com/344505
 #if defined(__has_feature)
-#if __has_feature(memory_sanitizer) && !defined(LIBYUV_DISABLE_NEON)
-#define LIBYUV_DISABLE_NEON
-#endif
-#if __has_feature(memory_sanitizer) && !defined(LIBYUV_DISABLE_X86)
+#if __has_feature(memory_sanitizer)
 #define LIBYUV_DISABLE_X86
 #endif
 #endif
@@ -78,16 +75,8 @@ extern "C" {
 // The following are available for Neon:
 #if !defined(LIBYUV_DISABLE_NEON) && \
     (defined(__ARM_NEON__) || defined(LIBYUV_NEON) || defined(__aarch64__))
-#define HAS_HAMMINGDISTANCE_NEON
 #define HAS_SUMSQUAREERROR_NEON
-#endif
-
-// The following are available for AArch64 Neon:
-#if !defined(LIBYUV_DISABLE_NEON) && defined(__aarch64__)
-#define HAS_HASHDJB2_NEON
-
-#define HAS_HAMMINGDISTANCE_NEON_DOTPROD
-#define HAS_SUMSQUAREERROR_NEON_DOTPROD
+#define HAS_HAMMINGDISTANCE_NEON
 #endif
 
 #if !defined(LIBYUV_DISABLE_MSA) && defined(__mips_msa)
@@ -110,9 +99,6 @@ uint32_t HammingDistance_AVX2(const uint8_t* src_a,
 uint32_t HammingDistance_NEON(const uint8_t* src_a,
                               const uint8_t* src_b,
                               int count);
-uint32_t HammingDistance_NEON_DotProd(const uint8_t* src_a,
-                                      const uint8_t* src_b,
-                                      int count);
 uint32_t HammingDistance_MSA(const uint8_t* src_a,
                              const uint8_t* src_b,
                              int count);
@@ -128,9 +114,6 @@ uint32_t SumSquareError_AVX2(const uint8_t* src_a,
 uint32_t SumSquareError_NEON(const uint8_t* src_a,
                              const uint8_t* src_b,
                              int count);
-uint32_t SumSquareError_NEON_DotProd(const uint8_t* src_a,
-                                     const uint8_t* src_b,
-                                     int count);
 uint32_t SumSquareError_MSA(const uint8_t* src_a,
                             const uint8_t* src_b,
                             int count);
@@ -138,7 +121,6 @@ uint32_t SumSquareError_MSA(const uint8_t* src_a,
 uint32_t HashDjb2_C(const uint8_t* src, int count, uint32_t seed);
 uint32_t HashDjb2_SSE41(const uint8_t* src, int count, uint32_t seed);
 uint32_t HashDjb2_AVX2(const uint8_t* src, int count, uint32_t seed);
-uint32_t HashDjb2_NEON(const uint8_t* src, int count, uint32_t seed);
 
 #ifdef __cplusplus
 }  // extern "C"
