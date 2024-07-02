@@ -55,7 +55,10 @@ file(GLOB libyuv_SRC ${libyuv_DIR}/source/*.cc)
 add_library(libyuv SHARED ${libyuv_SRC})
 
 
-
+# 要使用 NEON 在 CMake 目标中构建所有源文件，请将以下内容添加到 CMakeLists.txt 中
+if(ANDROID_ABI STREQUAL arm64-v8a)
+    set_target_properties(xxx PROPERTIES COMPILE_FLAGS -mfpu=neon)
+endif()
 
 
 target_link_libraries( # Specifies the target library.
