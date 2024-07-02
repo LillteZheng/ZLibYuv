@@ -1,5 +1,5 @@
 package com.zhengsr.libyuv
-
+import java.nio.ByteBuffer
 /**
  * @author by zhengshaorui 2024/6/25
  * describe：libyuv的工具类
@@ -17,7 +17,8 @@ object ZYuvTools {
         }
     }
 
-    private external fun nv21Scale(src:ByteArray,srcWidth:Int,srcHeight:Int,dst:ByteArray,dstWidth:Int,dstHeight:Int,mode:Int):Int
+    external fun nv21Scale(src:ByteArray,srcWidth:Int,srcHeight:Int,dst:ByteArray,dstWidth:Int,dstHeight:Int,mode:Int):Int
+    external fun nv21Scale2(src:ByteBuffer,srcWidth:Int,srcHeight:Int,dst:ByteBuffer,dstWidth:Int,dstHeight:Int,mode:Int)
 
     enum class FilterMode{
         NONE ,      // Point sample; Fastest.

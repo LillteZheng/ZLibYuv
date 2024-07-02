@@ -55,7 +55,10 @@ file(GLOB libyuv_SRC ${libyuv_DIR}/source/*.cc)
 add_library(libyuv SHARED ${libyuv_SRC})
 
 
-
+if(ANDROID_ABI STREQUAL arm64-v8a OR ANDROID_ABI STREQUAL armeabi-v7a)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mfpu=neon")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mfpu=neon")
+endif()
 
 
 target_link_libraries( # Specifies the target library.
