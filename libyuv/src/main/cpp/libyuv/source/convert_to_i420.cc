@@ -68,10 +68,10 @@ int ConvertToI420(const uint8_t* sample,
     return -1;
   }
 
-  // one pass rotation is available for some formats. for the rest, convert
-  // to i420 (with optional vertical flipping) into a temporary i420 buffer,
-  // and then rotate the i420 to the final destination buffer.
-  // for in-place conversion, if destination dst_y is same as source sample,
+  // One pass rotation is available for some formats. For the rest, convert
+  // to I420 (with optional vertical flipping) into a temporary I420 buffer,
+  // and then rotate the I420 to the final destination buffer.
+  // For in-place conversion, if destination dst_y is same as source sample,
   // also enable temporary buffer.
   if (need_buf) {
     int y_size = crop_width * abs_crop_height;
@@ -95,7 +95,7 @@ int ConvertToI420(const uint8_t* sample,
       int stride_u = (crop_x & 1) ? dst_stride_v : dst_stride_u;
       int stride_v = (crop_x & 1) ? dst_stride_u : dst_stride_v;
       src = sample + (aligned_src_width * crop_y + crop_x) * 2;
-      r = YUY2ToI420(src, src_width * 2, dst_y, dst_stride_y, u,
+      r = YUY2ToI420(src, aligned_src_width * 2, dst_y, dst_stride_y, u,
                      stride_u, v, stride_v, crop_width, inv_crop_height);
       break;
     }
@@ -105,7 +105,7 @@ int ConvertToI420(const uint8_t* sample,
       int stride_u = (crop_x & 1) ? dst_stride_v : dst_stride_u;
       int stride_v = (crop_x & 1) ? dst_stride_u : dst_stride_v;
       src = sample + (aligned_src_width * crop_y + crop_x) * 2;
-      r = UYVYToI420(src, src_width * 2, dst_y, dst_stride_y, u,
+      r = UYVYToI420(src, aligned_src_width * 2, dst_y, dst_stride_y, u,
                      stride_u, v, stride_v, crop_width, inv_crop_height);
       break;
     }
@@ -174,7 +174,7 @@ int ConvertToI420(const uint8_t* sample,
       src = sample + (src_width * crop_y + crop_x);
       src_uv = sample + (src_width * abs_src_height) +
                ((crop_y / 2) * aligned_src_width) + ((crop_x / 2) * 2);
-      r = NV12ToI420Rotate(src, src_width, src_uv, src_width, dst_y,
+      r = NV12ToI420Rotate(src, src_width, src_uv, aligned_src_width, dst_y,
                            dst_stride_y, dst_u, dst_stride_u, dst_v,
                            dst_stride_v, crop_width, inv_crop_height, rotation);
       break;
@@ -183,7 +183,7 @@ int ConvertToI420(const uint8_t* sample,
       src_uv = sample + (src_width * abs_src_height) +
                ((crop_y / 2) * aligned_src_width) + ((crop_x / 2) * 2);
       // Call NV12 but with dst_u and dst_v parameters swapped.
-      r = NV12ToI420Rotate(src, src_width, src_uv, src_width, dst_y,
+      r = NV12ToI420Rotate(src, src_width, src_uv, aligned_src_width, dst_y,
                            dst_stride_y, dst_v, dst_stride_v, dst_u,
                            dst_stride_u, crop_width, inv_crop_height, rotation);
       break;
